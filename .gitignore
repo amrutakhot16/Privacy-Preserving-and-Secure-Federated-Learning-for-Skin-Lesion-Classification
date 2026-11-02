@@ -1,0 +1,9 @@
+.venv/
+venv/
+data/
+results_smoke/
+__pycache__/
+*.pyc
+.DS_Store
+*.zip
+.vscode/

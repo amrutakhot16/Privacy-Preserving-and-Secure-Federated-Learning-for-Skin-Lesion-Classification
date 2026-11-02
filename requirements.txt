@@ -1,0 +1,7 @@
+flwr[simulation]==1.11.1
+ray==2.55.1
+torch==2.14.1
+numpy==1.26.4
+pandas==2.3.3
+pillow==12.3.0
+matplotlib==3.11.2
