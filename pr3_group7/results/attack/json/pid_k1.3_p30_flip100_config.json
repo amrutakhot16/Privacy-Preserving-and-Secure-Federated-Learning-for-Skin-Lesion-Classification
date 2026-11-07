@@ -1,0 +1,57 @@
+{
+  "tag": "pid_k1.3_p30_flip100",
+  "out": "results/attack",
+  "clients_dir": "/Users/amruta/VSCodeProjects/ISS_Federated_Learning/data/clients",
+  "poisoned_dir": "data/poisoned/p30_flip100",
+  "test": "/Users/amruta/VSCodeProjects/ISS_Federated_Learning/data/processed/test.npz",
+  "norm": "/Users/amruta/VSCodeProjects/ISS_Federated_Learning/data/processed/norm_stats.json",
+  "num_clients": 20,
+  "rounds": 20,
+  "local_epochs": 3,
+  "batch_size": 32,
+  "lr": 0.001,
+  "weight_decay": 0.0001,
+  "no_augment": false,
+  "class_weights": true,
+  "seed": 42,
+  "cpus_per_client": 1.0,
+  "gpus_per_client": 0.0,
+  "defense": "pid",
+  "kp": 1.0,
+  "ki": 0.05,
+  "kd": 0.5,
+  "threshold_mode": "median",
+  "threshold": 2.0,
+  "threshold_k": 1.3,
+  "distance_norm": "mean",
+  "min_keep": 2,
+  "framework": "flower 1.11.1",
+  "torch": "2.14.1",
+  "python": "3.13.7",
+  "strategy": "FedAvg + PID client filter (permanent exclusion of clients above the threshold)",
+  "total_seconds": 861.0,
+  "norm_mean": [
+    0.7637028928175078,
+    0.5383815801823604,
+    0.5619438350951013
+  ],
+  "norm_std": [
+    0.13664606689615758,
+    0.15778368540782386,
+    0.17587543613130377
+  ],
+  "detection": {
+    "true_positive": 1,
+    "false_negative": 5,
+    "false_positive": 7,
+    "true_negative": 7
+  },
+  "malicious_clients": [
+    7,
+    9,
+    10,
+    12,
+    14,
+    15
+  ]
+}

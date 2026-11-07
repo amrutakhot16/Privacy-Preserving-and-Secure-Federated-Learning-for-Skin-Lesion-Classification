@@ -17,6 +17,10 @@ subfolder per file type):
     T_train_per_client_long.csv  local training loss/accuracy reported in fit
     T_global_test.csv            global model on the clean held-out test set
     T_aggregation_log.csv        clients aggregated / excluded each round
+    T_pid_scores.csv             (PID runs only) one row per (round, client):
+                                 distance, P/I/D parts, score, threshold, excluded
+    T_detection_summary.csv      (PID runs only) per client: malicious or not,
+                                 excluded or not, round of exclusion
   json/
     T_config.json                every setting needed to reproduce the run
   plots/                         written by plot_results.py
@@ -105,6 +109,7 @@ class MetricsLogger:
         self.train_rows = []
         self.global_rows = []
         self.aggregation_rows = []
+        self.pid_rows = []
 
     def add_eval(self, server_round, client_id, loss, accuracy, num_examples):
         """
@@ -146,6 +151,7 @@ class MetricsLogger:
         """
         Record which clients were aggregated and which were excluded.
         Conventional FedAvg never excludes anyone, so excluded_ids is empty
+        in Part 2 and Part 3 (PID) fills it in.
         """
         self.aggregation_rows.append({
             "round": int(server_round),
@@ -157,6 +163,65 @@ class MetricsLogger:
             "num_failures": int(failures),
             "round_seconds": None if seconds is None else round(float(seconds), 2),
         })
+
+    def add_pid(self, server_round, client_id, raw_distance, distance, proportional,
+                integral, derivative, score, threshold, excluded, extra=None):
+        """
+        Record one client's PID score in one round (PID defense).
+        :param raw_distance: L2 distance to the centroid before normalization
+        :param distance: normalized distance D(t)
+        :param proportional, integral, derivative: the three PID terms
+        :param score: PID score u(t) = P + I + D
+        :param threshold: threshold used in this round
+        :param excluded: True if the client was excluded in this round
+        :param extra: optional dict of additional columns (e.g. distances
+                      measured on other layer choices)
+        """
+        row = {
+            "round": int(server_round),
+            "client": int(client_id),
+            "malicious": int(client_id in self.malicious_ids),
+            "raw_distance": float(raw_distance),
+            "distance": float(distance),
+            "p_term": float(proportional),
+            "i_term": float(integral),
+            "d_term": float(derivative),
+            "pid_score": float(score),
+            "threshold": float(threshold),
+            "excluded": int(bool(excluded)),
+        }
+        row.update(extra or {})
+        self.pid_rows.append(row)
+
+    def detection_summary(self, num_clients):
+        """
+        Per-client detection result of the PID defense.
+        :param num_clients: total number of clients in the federation
+        :return: DataFrame with one row per client
+        """
+        pid = pd.DataFrame(self.pid_rows)
+        rows = []
+        for client_id in range(num_clients):
+            client_rows = pid[(pid["client"] == client_id) & (pid["excluded"] == 1)] if len(pid) else pid
+            excluded_round = int(client_rows["round"].min()) if len(client_rows) else None
+            malicious = client_id in self.malicious_ids
+            excluded = excluded_round is not None
+            if malicious and excluded:
+                outcome = "true_positive"
+            elif malicious:
+                outcome = "false_negative"
+            elif excluded:
+                outcome = "false_positive"
+            else:
+                outcome = "true_negative"
+            rows.append({
+                "client": client_id,
+                "malicious": int(malicious),
+                "excluded": int(excluded),
+                "excluded_in_round": excluded_round,
+                "outcome": outcome,
+            })
+        return pd.DataFrame(rows)
 
     def _wide_table(self, eval_df, value):
         """
@@ -221,6 +286,17 @@ class MetricsLogger:
         if self.aggregation_rows:
             pd.DataFrame(self.aggregation_rows).sort_values("round").to_csv(
                 csv_prefix + "aggregation_log.csv", index=False)
+
+        if self.pid_rows:
+            pd.DataFrame(self.pid_rows).sort_values(["round", "client"]).to_csv(
+                csv_prefix + "pid_scores.csv", index=False)
+            num_clients = int(config.get("num_clients", 1 + max(r["client"] for r in self.pid_rows)))
+            summary = self.detection_summary(num_clients)
+            summary.to_csv(csv_prefix + "detection_summary.csv", index=False)
+            counts = summary["outcome"].value_counts()
+            config = dict(config)
+            config["detection"] = {k: int(counts.get(k, 0)) for k in
+                                   ("true_positive", "false_negative", "false_positive", "true_negative")}
 
         # Run settings.
         config = dict(config)
